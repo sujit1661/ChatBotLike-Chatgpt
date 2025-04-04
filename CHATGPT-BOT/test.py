@@ -2,23 +2,24 @@ import streamlit as st
 import google.generativeai as genai
 import re
 
-# ✅ Secure API key from secrets (No functionality changed)
+# ✅ Secure API key from secrets
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Load the Gemini model
+# Load the Gemini chat model
 model = genai.GenerativeModel("gemini-1.5-pro")
+chat_session = model.start_chat(history=[])
 
 # Page configuration
-st.set_page_config(page_title="GEN AI Chatbot", page_icon="🤖", layout="centered")
+st.set_page_config(page_title="GEN AI-S", page_icon="🤖", layout="centered")
 
 # Title
 st.title("🤖 GEN AI Chatbot")
 
-# Initialize chat history
+# Initialize chat history if not present
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Function to detect if response contains code
+# Function to extract and format code blocks
 def extract_code_blocks(response_text):
     """
     Detects code blocks in the response and separates them.
@@ -47,7 +48,7 @@ def extract_code_blocks(response_text):
 
     return code_blocks
 
-# Display previous messages
+# Display previous messages (excluding the latest input)
 for message in st.session_state.messages:
     role = message["role"]
     content = message["content"]
@@ -62,7 +63,10 @@ for message in st.session_state.messages:
 # User input
 user_input = st.chat_input("Type your message...")
 
-if user_input:
+if user_input and "last_user_input" not in st.session_state:
+    # Prevent duplicate input processing
+    st.session_state.last_user_input = user_input  
+
     # Store user message
     st.session_state.messages.append({"role": "user", "content": user_input})
 
@@ -75,13 +79,9 @@ if user_input:
         placeholder = st.empty()
         placeholder.markdown("_GEN AI is thinking..._")
 
-    # Build context from previous messages
-    context = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages])
-    full_prompt = f"Conversation history:\n{context}\n\nUSER: {user_input}\n\nAnswer based on the full conversation history, maintaining context and referencing previous messages when relevant."
-
-    # Get AI response
-    response = model.generate_content(full_prompt)
-    bot_response = response.text
+    # Get AI response using chat history
+    response = chat_session.send_message(user_input)
+    bot_response = response.text.strip()
 
     # Store bot message
     st.session_state.messages.append({"role": "bot", "content": bot_response})
@@ -94,3 +94,6 @@ if user_input:
                 st.code(block, language="python")
             else:
                 st.markdown(block)
+
+    # Clear last input tracking to allow the next message
+    del st.session_state.last_user_input
