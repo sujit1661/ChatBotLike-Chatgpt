@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import re
 
-# ✅ Secure API key from secrets – no functionality changed
+# ✅ Secure API key from secrets (No functionality changed)
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
 # Load the Gemini model
