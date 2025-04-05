@@ -23,12 +23,10 @@ if "messages" not in st.session_state:
 if "last_user_input" not in st.session_state:
     st.session_state.last_user_input = None
 
-# Function to extract and format code blocks
+# ✅ Function to extract and format code blocks
 def extract_code_blocks(response_text):
     code_blocks = []
-    pattern = re.compile(r"
-(\w+)?\n(.*?)\n
-", re.DOTALL)
+    pattern = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
     last_index = 0
 
     for match in pattern.finditer(response_text):
@@ -46,7 +44,7 @@ def extract_code_blocks(response_text):
 
     return code_blocks
 
-# Display previous messages
+# ✅ Display previous messages
 for message in st.session_state.messages:
     role = message["role"]
     content = message["content"]
@@ -58,7 +56,7 @@ for message in st.session_state.messages:
             else:
                 st.markdown(block)
 
-# User input
+# ✅ User input
 user_input = st.chat_input("Type your message...")
 
 if user_input and user_input != st.session_state.last_user_input:
@@ -91,4 +89,4 @@ if user_input and user_input != st.session_state.last_user_input:
             if is_code:
                 st.code(block, language="python")
             else:
-                st.markdown(block) 
+                st.markdown(block)
