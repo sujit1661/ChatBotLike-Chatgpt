@@ -2,39 +2,33 @@ import streamlit as st
 import google.generativeai as genai
 import re
 
-# ✅ Must be the first Streamlit command
-st.set_page_config(page_title="GEN AI Chatbot", page_icon="🤖", layout="centered")
+# ✅ Secure API key from secrets
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ✅ Google Analytics
-st.markdown("""
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-28VFMD1H97"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-28VFMD1H97');
-    </script>
-""", unsafe_allow_html=True)
-
-# ⚠️ API Key (consider using secrets for production)
-API_KEY = "AIzaSyBcalMKa-rIwnRGYLWFKOZAaHjl_AJ4HFc"
-genai.configure(api_key=API_KEY)
-
-# Load Gemini model
+# Load the Gemini chat model
 model = genai.GenerativeModel("gemini-1.5-pro")
+chat_session = model.start_chat(history=[])
+
+# Page configuration
+st.set_page_config(page_title="GEN AI-S", page_icon="🤖", layout="centered")
 
 # Title
 st.title("🤖 GEN AI Chatbot")
 
-# Initialize chat history
+# Initialize chat history if not present
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Function to extract code blocks
+# ✅ Initialize last input tracker
+if "last_user_input" not in st.session_state:
+    st.session_state.last_user_input = None
+
+# Function to extract and format code blocks
 def extract_code_blocks(response_text):
     code_blocks = []
-    pattern = re.compile(r"```(\w+)?\n(.*?)\n```", re.DOTALL)
+    pattern = re.compile(r"
+(\w+)?\n(.*?)\n
+", re.DOTALL)
     last_index = 0
 
     for match in pattern.finditer(response_text):
@@ -52,44 +46,49 @@ def extract_code_blocks(response_text):
 
     return code_blocks
 
-# Display past chat
+# Display previous messages
 for message in st.session_state.messages:
     role = message["role"]
     content = message["content"]
+
     with st.chat_message(role):
         for block, is_code in extract_code_blocks(content):
-            st.code(block, language="python") if is_code else st.markdown(block)
+            if is_code:
+                st.code(block, language="python")
+            else:
+                st.markdown(block)
 
-# Input box
+# User input
 user_input = st.chat_input("Type your message...")
 
-# Track and handle new input
-if user_input and (st.session_state.get("last_input") != user_input):
-    st.session_state.last_input = user_input  # Prevent duplicate processing
+if user_input and user_input != st.session_state.last_user_input:
+    # ✅ Prevent duplicate processing
+    st.session_state.last_user_input = user_input
 
-    # Store and display user message
+    # Store user message
     st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(f"**You:** {user_input}")
 
-    # Show "thinking" message
-    with st.chat_message("assistant"):
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(f"**You**: {user_input}")
+
+    # Show thinking message
+    with st.chat_message("bot"):
         placeholder = st.empty()
         placeholder.markdown("_GEN AI is thinking..._")
 
-    # Prepare full prompt with history
-    context = "\n".join([f"{m['role'].upper()}: {m['content']}" for m in st.session_state.messages[:-1]])
-    prompt = f"Conversation history:\n{context}\n\nUSER: {user_input}\n\nReply as GEN AI while maintaining context."
-
-    # Generate response
-    response = model.generate_content(prompt)
+    # Get AI response using chat history
+    response = chat_session.send_message(user_input)
     bot_response = response.text.strip()
 
-    placeholder.empty()
+    # Store bot message
+    st.session_state.messages.append({"role": "bot", "content": bot_response})
 
-    if bot_response:
-        # Store and display response
-        st.session_state.messages.append({"role": "assistant", "content": bot_response})
-        with st.chat_message("assistant"):
-            for block, is_code in extract_code_blocks(bot_response):
-                st.code(block, language="python") if is_code else st.markdown(block)
+    # Remove placeholder and show response
+    placeholder.empty()
+    with st.chat_message("bot"):
+        for block, is_code in extract_code_blocks(bot_response):
+            if is_code:
+                st.code(block, language="python")
+            else:
+                st.markdown(block) 
